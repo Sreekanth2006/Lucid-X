@@ -26,6 +26,8 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime
 import warnings
+import argparse
+import sys
 warnings.filterwarnings('ignore')
 
 # Audio processing
@@ -61,7 +63,7 @@ class AudioEmotionRecognizer:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Load pretrained model
-        print(f"🔄 Loading pretrained model: {model_name}")
+        print(f"[LOAD] Loading pretrained model: {model_name}")
         self.pipe = pipeline("audio-classification", model=model_name)
         
         # Emotion mapping
@@ -73,7 +75,7 @@ class AudioEmotionRecognizer:
         self.predictions = []
         self.feature_cache = {}
         
-        print("✅ Audio Emotion Recognizer initialized")
+        print("[OK] Audio Emotion Recognizer initialized")
         print(f"   Model: {model_name}")
         print(f"   Output dir: {self.output_dir}")
         print(f"   Emotions: {', '.join(self.emotion_labels)}")
@@ -89,16 +91,16 @@ class AudioEmotionRecognizer:
         Returns:
             tuple: (audio, sr) - audio waveform and sampling rate
         """
-        print(f"\n🎧 Loading audio: {audio_path}")
+        print(f"[AUDIO] Loading audio: {audio_path}")
         
         try:
             audio, sr = librosa.load(audio_path, sr=target_sr)
-            print(f"   ✅ Loaded successfully")
-            print(f"      Duration: {len(audio)/sr:.2f}s")
-            print(f"      Sampling rate: {sr} Hz")
+            print(f"[OK] Loaded successfully")
+            print(f"[INFO] Duration: {len(audio)/sr:.2f}s")
+            print(f"[INFO] Sampling rate: {sr} Hz")
             return audio, sr
         except Exception as e:
-            print(f"   ❌ Error loading audio: {e}")
+            print(f"[ERROR] Error loading audio: {e}")
             return None, None
     
     def predict_emotion(self, audio_path):
@@ -111,7 +113,7 @@ class AudioEmotionRecognizer:
         Returns:
             dict: Prediction result with emotion and confidence
         """
-        print(f"\n🧠 Predicting emotion from: {Path(audio_path).name}")
+        print(f"[PREDICT] Predicting emotion from: {Path(audio_path).name}")
         
         try:
             # Load audio using librosa
@@ -135,13 +137,13 @@ class AudioEmotionRecognizer:
             
             self.predictions.append(prediction)
             
-            print(f"   Emotion: {emotion.upper()}")
-            print(f"   Confidence: {confidence*100:.2f}%")
+            print(f"[RESULT] Emotion: {emotion.upper()}")
+            print(f"[RESULT] Confidence: {confidence*100:.2f}%")
             
             return prediction
             
         except Exception as e:
-            print(f"   ❌ Error during prediction: {e}")
+            print(f"[ERROR] Error during prediction: {e}")
             return None
     
     def batch_predict(self, audio_dir):
@@ -560,12 +562,21 @@ if __name__ == '__main__':
     No training needed - direct inference on audio files
     
     Usage:
-        # Single file prediction
-        python train.py
+        # Single file prediction (for API)
+        python train.py --audio path/to/audio.wav
         
         # Batch processing
-        recognizer.batch_predict('audio_dataset/')
+        python train.py --batch audio_dataset/
+        
+        # Default (test mode)
+        python train.py
     """
+    
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='Lucid-X Audio Emotion Recognition')
+    parser.add_argument('--audio', type=str, help='Path to single audio file for prediction')
+    parser.add_argument('--batch', type=str, help='Directory for batch processing')
+    args = parser.parse_args()
     
     print("\n" + "="*60)
     print("LUCID-X: AUDIO EMOTION RECOGNITION")
@@ -578,32 +589,56 @@ if __name__ == '__main__':
         output_dir='models/audio'
     )
     
-    # Example: Single file prediction
-    # Uncomment and update with your audio file path
-    # prediction = recognizer.predict_emotion('path/to/your/audio.wav')
+    # Single file prediction (for API/Server integration)
+    if args.audio:
+        print(f"[PROCESS] Processing single audio file: {args.audio}")
+        if not os.path.exists(args.audio):
+            print(f"[ERROR] File not found: {args.audio}")
+            sys.exit(1)
+        
+        prediction = recognizer.predict_emotion(args.audio)
+        
+        if prediction:
+            # Output JSON for API consumption
+            output = {
+                'emotion': prediction['emotion'],
+                'confidence': prediction['confidence'],
+                'all_scores': prediction['all_scores']
+            }
+            print(json.dumps(output))
+            sys.exit(0)
+        else:
+            print(json.dumps({'emotion': 'ERROR', 'confidence': 0, 'error': 'Processing failed'}))
+            sys.exit(1)
     
-    # Example: Batch processing
-    # Uncomment to process all audio files in a directory
-    # predictions = recognizer.batch_predict('audio_dataset/')
-    # recognizer.save_results()
-    # recognizer.create_emotion_report()
-    
-    # Quick test with a sample if available
-    audio_dir = Path('audio_dataset')
-    if audio_dir.exists():
-        print(f"\n🎧 Found audio_dataset directory")
-        predictions = recognizer.batch_predict(str(audio_dir))
+    # Batch processing
+    elif args.batch:
+        print(f"[BATCH] Batch processing directory: {args.batch}")
+        predictions = recognizer.batch_predict(args.batch)
         
         if predictions:
             recognizer.save_results()
             recognizer.create_emotion_report()
+        sys.exit(0)
+    
+    # Default: Test mode
     else:
-        print(f"\n📁 audio_dataset not found")
-        print("   To use:")
-        print("   1. Add audio files (.wav, .mp3) to audio_dataset/")
-        print("   2. Or test with single file:")
-        print("      recognizer.predict_emotion('path/to/audio.wav')")
+        # Quick test with audio_dataset if available
+        audio_dir = Path('audio_dataset')
+        if audio_dir.exists():
+            print(f"[FOUND] Found audio_dataset directory")
+            predictions = recognizer.batch_predict(str(audio_dir))
+            
+            if predictions:
+                recognizer.save_results()
+                recognizer.create_emotion_report()
+        else:
+            print(f"[INFO] audio_dataset not found")
+            print("   To use:")
+            print("   1. Add audio files (.wav, .mp3) to audio_dataset/")
+            print("   2. Or test with single file:")
+            print("      python train.py --audio path/to/audio.wav")
     
     print("\n" + "="*60)
-    print("✅ AUDIO EMOTION RECOGNITION READY")
+    print("[SUCCESS] AUDIO EMOTION RECOGNITION READY")
     print("="*60)

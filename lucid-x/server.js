@@ -2,12 +2,27 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const fs = require('fs');
+const { execSync } = require('child_process');
+const multer = require('multer');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Middleware
 app.use(express.static('public'));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb' }));
+
+// Temp directory for audio files
+const tempDir = path.join(__dirname, '..', 'temp_audio');
+if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+}
+
+// Multer for audio upload
+const upload = multer({ dest: tempDir });
 
 // Routes for different interfaces
 app.get('/', (req, res) => {
@@ -20,6 +35,74 @@ app.get('/patient', (req, res) => {
 
 app.get('/therapist', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'therapist.html'));
+});
+
+app.get('/realtime', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'realtime.html'));
+});
+
+app.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+// 🎤 API Endpoint for Real-Time Audio Emotion Detection
+app.post('/api/emotion/audio', upload.single('audio'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No audio file provided' });
+        }
+
+        const audioPath = req.file.path;
+        
+        // Call Python emotion recognizer with UTF-8 encoding
+        const pythonScript = path.join(__dirname, '..', 'train.py');
+        const result = execSync(`python "${pythonScript}" --audio "${audioPath}"`, {
+            encoding: 'utf-8',
+            cwd: path.join(__dirname, '..'),
+            env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        });
+
+        // Parse result - extract JSON from output (last line)
+        const lines = result.trim().split('\n');
+        const jsonLine = lines.find(line => line.startsWith('{'));
+        
+        if (!jsonLine) {
+            return res.json({
+                success: false,
+                emotion: 'ERROR',
+                confidence: 0,
+                error: 'No JSON output from emotion analyzer'
+            });
+        }
+        
+        const emotionData = JSON.parse(jsonLine);
+
+        // Clean up temp file
+        if (fs.existsSync(audioPath)) {
+            fs.unlinkSync(audioPath);
+        }
+
+        res.json({
+            success: true,
+            emotion: emotionData.emotion,
+            confidence: emotionData.confidence,
+            allScores: emotionData.all_scores,
+            timestamp: Date.now()
+        });
+
+    } catch (error) {
+        console.error('❌ Emotion detection error:', error);
+        // Clean up temp file on error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.json({
+            success: false,
+            emotion: 'ERROR',
+            confidence: 0,
+            error: error.message
+        });
+    }
 });
 
 // Room management
