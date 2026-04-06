@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucid-X - Camera & Emotion Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f172a;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .test-section {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .test-section h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #34d399;
+        }
+        
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #0f172a;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            -webkit-transform: scaleX(-1);
+            transform: scaleX(-1);
+        }
+        
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background:rgba(15, 23, 42, 0.8);
+            color: #94a3b8;
+            gap: 10px;
+        }
+        
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #06b6d4;
+        }
+        
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        
+        .status-box {
+            background: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #334155;
+        }
+        
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        
+        .label {
+            font-weight: 500;
+            color: #94a3b8;
+        }
+        
+        .status {
+            color: #34d399;
+            font-weight: 600;
+        }
+        
+        .status.error {
+            color: #f87171;
+        }
+        
+        .emotion-display {
+            background: #0f172a;
+            border: 2px solid #34d399;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .emotion-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #34d399;
+            margin: 10px 0;
+        }
+        
+        .confidence-bar {
+            width: 100%;
+            height: 20px;
+            background: #1e293b;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: #34d399;
+            transition: width 0.3s;
+        }
+        
+        .confidence-value {
+            display: block;
+            margin-top: 5px;
+            color: #94a3b8;
+        }
+        
+        .debug-log {
+            background: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #a1e8dc;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            padding: 2px 0;
+        }
+        
+        .log-error {
+            color: #f87171;
+        }
+        
+        .log-success {
+            color: #34d399;
+        }
+        
+        .log-warning {
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Lucid-X Camera & Emotion Detection Test</h1>
+        
+        <!-- Camera Test -->
+        <div class="test-section">
+            <h2>📹 Camera Access Test</h2>
+            
+            <div class="control-buttons">
+                <button id="start-camera">Start Camera</button>
+                <button id="stop-camera" disabled>Stop Camera</button>
+            </div>
+            
+            <div class="video-wrapper">
+                <video id="video-element" playsinline autoplay muted></video>
+                <div id="video-overlay" class="overlay">
+                    <p>Click "Start Camera" to begin</p>
+                </div>
+            </div>
+            
+            <div class="status-box" id="camera-status">
+                <div class="status-item">
+                    <span class="label">Camera Status:</span>
+                    <span class="status" id="camera-status-text">Not Started</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Video Resolution:</span>
+                    <span class="status" id="video-resolution">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Browser Support:</span>
+                    <span class="status" id="browser-support">Checking...</span>
+                </span>
+            </div>
+        </div>
+        
+        <!-- Emotion Detection Test -->
+        <div class="test-section">
+            <h2>🧠 Emotion Detection Test</h2>
+            
+            <div class="control-buttons">
+                <button id="load-models">Load AI Models</button>
+                <button id="start-detection" disabled>Start Detection</button>
+                <button id="stop-detection" disabled>Stop Detection</button>
+            </div>
+            
+            <div class="status-box" id="models-status">
+                <div class="status-item">
+                    <span class="label">Models Status:</span>
+                    <span class="status" id="models-status-text">Not Loaded</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Detection Status:</span>
+                    <span class="status" id="detection-status-text">Idle</span>
+                </div>
+            </div>
+            
+            <div id="emotion-display" class="emotion-display" style="display: none;">
+                <div class="label">Current Emotion</div>
+                <div class="emotion-value" id="emotion-value">Detecting...</div>
+                <div class="confidence-bar">
+                    <div id="confidence-fill" class="confidence-fill"></div>
+                </div>
+                <span class="confidence-value" id="confidence-value">0%</span>
+            </div>
+        </div>
+        
+        <!-- Debug Log -->
+        <div class="test-section">
+            <h2>📋 Debug Log</h2>
+            <div class="debug-log" id="debug-log">
+                <div class="log-entry log-success">✅ Page loaded successfully</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load TensorFlow and Face-API -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.5.0/dist/tf-core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.5.0/dist/tf-converter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.min.js"></script>
+    
+    <script>
+        // Debug logger
+        const debugLog = document.getElementById('debug-log');
+        let logCount = 0;
+        
+        function addLog(message, type = 'info') {
+            logCount++;
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            if (type === 'error') {
+                entry.className += ' log-error';
+                entry.textContent = `[${timestamp}] ❌ ${message}`;
+            } else if (type === 'success') {
+                entry.className += ' log-success';
+                entry.textContent = `[${timestamp}] ✅ ${message}`;
+            } else if (type === 'warning') {
+                entry.className += ' log-warning';
+                entry.textContent = `[${timestamp}] ⚠️ ${message}`;
+            } else {
+                entry.textContent = `[${timestamp}] ℹ️ ${message}`;
+            }
+            
+            debugLog.appendChild(entry);
+            debugLog.scrollTop = debugLog.scrollHeight;
+            
+            if (logCount > 50) {
+                debugLog.removeChild(debugLog.firstChild);
+            }
+        }
+        
+        // Elements
+        const videoElement = document.getElementById('video-element');
+        const videoOverlay = document.getElementById('video-overlay');
+        const emotionDisplay = document.getElementById('emotion-display');
+        const emotionValue = document.getElementById('emotion-value');
+        const confidenceFill = document.getElementById('confidence-fill');
+        const confidenceValue = document.getElementById('confidence-value');
+        
+        // Buttons
+        const startCameraBtn = document.getElementById('start-camera');
+        const stopCameraBtn = document.getElementById('stop-camera');
+        const loadModelsBtn = document.getElementById('load-models');
+        const startDetectionBtn = document.getElementById('start-detection');
+        const stopDetectionBtn = document.getElementById('stop-detection');
+        
+        // State
+        let localStream;
+        let modelsLoaded = false;
+        let detectionRunning = false;
+        let detectionInterval;
+        
+        // Check browser support
+        addLog('Checking browser support...');
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            document.getElementById('browser-support').textContent = 'Supported ✅';
+            document.getElementById('browser-support').classList.remove('error');
+            addLog('getUserMedia supported', 'success');
+        } else {
+            document.getElementById('browser-support').textContent = 'Not Supported ❌';
+            document.getElementById('browser-support').classList.add('error');
+            addLog('getUserMedia not supported', 'error');
+        }
+        
+        // Camera controls
+        startCameraBtn.addEventListener('click', async () => {
+            try {
+                addLog('Requesting camera access...');
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+                
+                videoElement.srcObject = localStream;
+                videoOverlay.style.display = 'none';
+                
+                const tracks = localStream.getVideoTracks();
+                if (tracks[0]) {
+                    const settings = tracks[0].getSettings();
+                    document.getElementById('video-resolution').textContent = `${settings.width}x${settings.height}`;
+                    addLog(`Camera started: ${settings.width}x${settings.height}`, 'success');
+                }
+                
+                document.getElementById('camera-status-text').textContent = 'Active ✅';
+                startCameraBtn.disabled = true;
+                stopCameraBtn.disabled = false;
+                loadModelsBtn.disabled = false;
+                
+            } catch (error) {
+                document.getElementById('camera-status-text').textContent = 'Error ❌';
+                document.getElementById('camera-status-text').classList.add('error');
+                addLog(`Camera error: ${error.name} - ${error.message}`, 'error');
+            }
+        });
+        
+        stopCameraBtn.addEventListener('click', () => {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                videoOverlay.style.display = 'flex';
+                videoOverlay.textContent = 'Camera stopped';
+                
+                document.getElementById('camera-status-text').textContent = 'Stopped';
+                startCameraBtn.disabled = false;
+                stopCameraBtn.disabled = true;
+                
+                addLog('Camera stopped', 'warning');
+            }
+        });
+        
+        // Model loading
+        loadModelsBtn.addEventListener('click', async () => {
+            try {
+                addLog('Loading emotion recognition models...');
+                document.getElementById('models-status-text').textContent = 'Loading...';
+                
+                const modelUri = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
+                
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(modelUri),
+                    faceapi.nets.faceExpressionNet.loadFromUri(modelUri)
+                ]);
+                
+                modelsLoaded = true;
+                document.getElementById('models-status-text').textContent = 'Ready ✅';
+                loadModelsBtn.disabled = true;
+                startDetectionBtn.disabled = false;
+                
+                addLog('Models loaded successfully', 'success');
+                
+            } catch (error) {
+                document.getElementById('models-status-text').textContent = 'Failed ❌';
+                document.getElementById('models-status-text').classList.add('error');
+                addLog(`Model loading error: ${error.message}`, 'error');
+            }
+        });
+        
+        // Emotion detection
+        startDetectionBtn.addEventListener('click', () => {
+            if (!modelsLoaded || !localStream) {
+                addLog('Models not loaded or camera not active', 'error');
+                return;
+            }
+            
+            detectionRunning = true;
+            emotionDisplay.style.display = 'block';
+            document.getElementById('detection-status-text').textContent = 'Running...';
+            startDetectionBtn.disabled = true;
+            stopDetectionBtn.disabled = false;
+            
+            addLog('Starting emotion detection', 'success');
+            
+            detectionInterval = setInterval(async () => {
+                try {
+                    const options = new faceapi.TinyFaceDetectorOptions({
+                        inputSize: 416,
+                        scoreThreshold: 0.5
+                    });
+                    
+                    const detections = await faceapi
+                        .detectSingleFace(videoElement, options)
+                        .withFaceExpressions();
+                    
+                    if (detections && detections.expressions) {
+                        const expressions = detections.expressions;
+                        const emotionEntries = Object.entries(expressions);
+                        const [emotionName, confidence] = emotionEntries.reduce((a, b) => a[1] > b[1] ? a : b);
+                        
+                        const percentge = Math.round(confidence * 100);
+                        emotionValue.textContent = emotionName.toUpperCase();
+                        confidenceValue.textContent = `${percentge}%`;
+                        confidenceFill.style.width = `${percentge}%`;
+                        
+                    } else {
+                        emotionValue.textContent = 'No Face';
+                        confidenceValue.textContent = '0%';
+                        confidenceFill.style.width = '0%';
+                    }
+                } catch (error) {
+                    addLog(`Detection error: ${error.message}`, 'error');
+                }
+            }, 500);
+        });
+        
+        stopDetectionBtn.addEventListener('click', () => {
+            detectionRunning = false;
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+            }
+            
+            document.getElementById('detection-status-text').textContent = 'Stopped';
+            emotionDisplay.style.display = 'none';
+            startDetectionBtn.disabled = false;
+            stopDetectionBtn.disabled = true;
+            
+            addLog('Emotion detection stopped', 'warning');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucid-X Teleconsultation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    
+    <header>
+        <h1>Lucid-X Session</h1>
+        <div class="status-badge">Secure Connection Active</div>
+    </header>
+
+    <div class="dashboard-container">
+        
+        <div class="video-section">
+            <div id="video-grid"></div>
+            
+            <div class="controls-bar">
+                <button id="toggle-mic" class="control-btn" title="Mute/Unmute Microphone">
+                    <span class="material-symbols-outlined">mic</span>
+                </button>
+                <button id="toggle-cam" class="control-btn" title="Turn Camera On/Off">
+                    <span class="material-symbols-outlined">videocam</span>
+                </button>
+                <button id="end-call" class="control-btn danger" title="End Consultation">
+                    <span class="material-symbols-outlined">call_end</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="analysis-sidebar">
+            <h2>Emotion Dynamics (Lucid-X)</h2>
+            
+            <div id="ai-status" style="color: var(--accent-color); margin-bottom: 20px; font-weight: 500;">
+                Loading ML Models...
+            </div>
+            
+            <div id="emotion-data" style="display: none; flex-direction: column; gap: 15px;">
+                <h3 style="color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase;">Current State</h3>
+                <div id="dominant-emotion" style="font-size: 2.5rem; font-weight: 600; text-transform: capitalize; color: var(--text-primary);">
+                    Detecting...
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

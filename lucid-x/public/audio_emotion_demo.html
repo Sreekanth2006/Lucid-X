@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucid-X: Real-Time Audio + Video Emotion Recognition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .video-section h2,
+        .emotion-section h2,
+        .metrics-section h2 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .video-container {
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+        }
+
+        #remoteVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .emotion-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .emotion-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .emotion-card.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .emotion-card label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            opacity: 0.7;
+            margin-bottom: 8px;
+        }
+
+        .emotion-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .emotion-card .confidence {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .metric {
+            background: #f5f7fa;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .metric label {
+            display: block;
+            font-size: 10px;
+            text-transform: uppercase;
+            color: #999;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .metric .value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-secondary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #bbdefb;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status.success .status-indicator {
+            background: #4caf50;
+        }
+
+        .status.error .status-indicator {
+            background: #f44336;
+        }
+
+        .status.info .status-indicator {
+            background: #2196f3;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .agreement-details {
+            background: #f5f7fa;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #666;
+        }
+
+        .agreement-details strong {
+            display: block;
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        .logs {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+            line-height: 1.4;
+            margin-top: 15px;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 2px 0;
+        }
+
+        .log-entry.error {
+            color: #ff6b6b;
+        }
+
+        .log-entry.warn {
+            color: #ffd93d;
+        }
+
+        .log-entry.info {
+            color: #6bcf7f;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .emotion-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎭 Lucid-X: Multimodal Emotion Recognition</h1>
+            <p>Real-time fusion of audio and video emotion detection</p>
+        </div>
+
+        <div class="content">
+            <!-- Video Stream -->
+            <div class="video-section">
+                <h2>Video Stream</h2>
+                <div class="video-container">
+                    <video id="remoteVideo" autoplay playsinline></video>
+                </div>
+            </div>
+
+            <!-- Emotion Display -->
+            <div class="emotion-section">
+                <h2>Real-Time Emotions</h2>
+
+                <div id="statusContainer"></div>
+
+                <div class="controls">
+                    <button class="btn-primary" id="startBtn">Start</button>
+                    <button class="btn-secondary" id="stopBtn" disabled>Stop</button>
+                </div>
+
+                <div class="emotion-cards">
+                    <div class="emotion-card" id="facialCard">
+                        <label>Facial</label>
+                        <div class="value" id="facialEmotion">--</div>
+                        <div class="confidence">
+                            Confidence: <span id="facialConf">--</span>%
+                        </div>
+                    </div>
+
+                    <div class="emotion-card" id="audioCard">
+                        <label>Audio</label>
+                        <div class="value" id="audioEmotion">--</div>
+                        <div class="confidence">
+                            Confidence: <span id="audioConf">--</span>%
+                        </div>
+                    </div>
+
+                    <div class="emotion-card" style="grid-column: 1 / -1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;" id="fusedCard">
+                        <label style="opacity: 0.9;">Fused Emotion</label>
+                        <div class="value" id="fusedEmotion">--</div>
+                        <div class="confidence">
+                            Confidence: <span id="fusedConf">--</span>% |
+                            Agreement: <span id="fusedAgreement">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="agreementDetails" style="margin-top: 15px;"></div>
+            </div>
+
+            <!-- Metrics -->
+            <div class="metrics-section full-width">
+                <h2>Performance Metrics</h2>
+
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <label>FPS (Video)</label>
+                        <div class="value" id="videoFPS">--</div>
+                    </div>
+
+                    <div class="metric">
+                        <label>Audio Latency</label>
+                        <div class="value" id="audioLatency">--</div>
+                    </div>
+
+                    <div class="metric">
+                        <label>Buffer Size</label>
+                        <div class="value" id="bufferSize">0</div>
+                    </div>
+
+                    <div class="metric">
+                        <label>Fusion Strategy</label>
+                        <div class="value" id="fusionStrategy">--</div>
+                    </div>
+
+                    <div class="metric">
+                        <label>Audio Events</label>
+                        <div class="value" id="audioEvents">0</div>
+                    </div>
+
+                    <div class="metric">
+                        <label>Facial Events</label>
+                        <div class="value" id="facialEvents">0</div>
+                    </div>
+                </div>
+
+                <div class="logs" id="logs"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load all required modules (in order) -->
+    <script src="audioCapture.js"></script>
+    <script src="audioEmotionPredictor.js"></script>
+    <script src="emotionEventBuffer.js"></script>
+    <script src="advancedMultimodalFusion.js"></script>
+    <script src="audioIntegrationExample.js"></script>
+
+    <script>
+        /**
+         * DEMO APPLICATION
+         * Shows complete integration of audio + video emotion recognition
+         */
+
+        class LucidXDemo {
+            constructor() {
+                this.integration = null;
+                this.videoElement = document.getElementById('remoteVideo');
+                this.isRunning = false;
+                this.mockDetections = true; // Set to false when real facial detection is available
+                this.frameCount = 0;
+                this.lastTime = performance.now();
+
+                this._setupEventListeners();
+                this._setupLogging();
+            }
+
+            _setupEventListeners() {
+                document.getElementById('startBtn').addEventListener('click', () => this.start());
+                document.getElementById('stopBtn').addEventListener('click', () => this.stop());
+            }
+
+            _setupLogging() {
+                this.logs = [];
+                const originalLog = console.log;
+                const originalError = console.error;
+                const originalWarn = console.warn;
+
+                ['log', 'error', 'warn'].forEach(level => {
+                    const prefix = level === 'log' ? '' : level.toUpperCase();
+                    console.__defineGetter__(level, () => {
+                        return (msg) => {
+                            const logMsg = prefix ? `[${prefix}] ${msg}` : msg;
+                            this._addLog(logMsg, level);
+                        };
+                    });
+                });
+
+                // Fallback
+                console.log = (msg) => {
+                    this._addLog(msg, 'log');
+                };
+                console.error = (msg) => {
+                    this._addLog(`[ERROR] ${msg}`, 'error');
+                };
+                console.warn = (msg) => {
+                    this._addLog(`[WARN] ${msg}`, 'warn');
+                };
+            }
+
+            _addLog(msg, level = 'info') {
+                this.logs.push({ msg, level, time: new Date().toLocaleTimeString() });
+                if (this.logs.length > 50) this.logs.shift();
+
+                const logsDiv = document.getElementById('logs');
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${level}`;
+                entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                logsDiv.appendChild(entry);
+                logsDiv.scrollTop = logsDiv.scrollHeight;
+            }
+
+            async start() {
+                try {
+                    this._updateStatus('Initializing...', 'info');
+
+                    // Initialize integration
+                    this.integration = new LucidXAudioIntegration({
+                        fusionStrategy: 'adaptive',
+                        predictionMethod: 'rule-based',
+                        onEmotionUpdate: (emotion) => this._updateDisplay(emotion),
+                        onError: (error) => {
+                            console.error(error);
+                            this._updateStatus(`Error: ${error.message}`, 'error');
+                        }
+                    });
+
+                    const initOk = await this.integration.initialize();
+                    if (!initOk) {
+                        this._updateStatus('Audio module failed (facial-only mode)', 'warn');
+                    }
+
+                    // Setup video
+                    await this._setupVideo();
+
+                    // Start processing
+                    this.integration.start();
+                    this.isRunning = true;
+
+                    // Start mock detection loop (if enabled)
+                    if (this.mockDetections) {
+                        this._startMockDetections();
+                    }
+
+                    this._updateStatus('✓ Running', 'success');
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+
+                    // Start metrics update loop
+                    this._startMetricsUpdate();
+
+                } catch (error) {
+                    console.error('Initialization error:', error);
+                    this._updateStatus(error.message, 'error');
+                }
+            }
+
+            stop() {
+                if (this.integration) {
+                    this.integration.stop();
+                }
+                this.isRunning = false;
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                this._updateStatus('Stopped', 'info');
+            }
+
+            async _setupVideo() {
+                try {
+                    // Use user's camera
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: 640, height: 480 },
+                        audio: false // Audio handled separately by audioCapture module
+                    });
+
+                    this.videoElement.srcObject = stream;
+
+                    return new Promise((resolve) => {
+                        this.videoElement.onloadedmetadata = () => {
+                            this.videoElement.play();
+                            resolve();
+                        };
+                    });
+                } catch (error) {
+                    console.warn('Camera permission denied, using test patterns');
+                    // Could load test video here
+                    throw error;
+                }
+            }
+
+            _startMockDetections() {
+                // Simulate facial emotion detection from existing system
+                const emotions = ['happy', 'sad', 'angry', 'neutral', 'surprised', 'fearful'];
+                let emotionIndex = 0;
+
+                setInterval(() => {
+                    if (!this.isRunning) return;
+
+                    const emotion = emotions[emotionIndex % emotions.length];
+                    const confidence = 0.7 + Math.random() * 0.25;
+
+                    // Simulate facial detection
+                    this.integration.recordFaceEmotion({
+                        dominantEmotion: emotion,
+                        confidence: confidence,
+                        allExpressions: {
+                            'happy': emotion === 'happy' ? confidence : Math.random() * 0.2,
+                            'sad': emotion === 'sad' ? confidence : Math.random() * 0.2,
+                            'angry': emotion === 'angry' ? confidence : Math.random() * 0.2,
+                            'neutral': emotion === 'neutral' ? confidence : Math.random() * 0.2,
+                            'surprised': emotion === 'surprised' ? confidence : Math.random() * 0.2,
+                            'fearful': emotion === 'fearful' ? confidence : Math.random() * 0.2,
+                            'disgusted': Math.random() * 0.2
+                        }
+                    });
+
+                    emotionIndex++;
+                }, 500); // Simulate 2 facial detections per second
+            }
+
+            _startMetricsUpdate() {
+                setInterval(() => {
+                    if (!this.isRunning) return;
+
+                    const stats = this.integration.getStatistics();
+
+                    // Update metrics
+                    if (stats.metrics) {
+                        document.getElementById('videoFPS').textContent = 
+                            `${stats.metrics.fps || 0} fps`;
+                        document.getElementById('audioLatency').textContent = 
+                            `${(stats.metrics.audioLatency || 0).toFixed(1)} ms`;
+                        document.getElementById('fusionStrategy').textContent = 
+                            this.integration.config.fusionStrategy.toUpperCase();
+                    }
+
+                    if (stats.buffer) {
+                        document.getElementById('bufferSize').textContent = 
+                            `${stats.buffer.totalEvents || 0}`;
+                        document.getElementById('audioEvents').textContent = 
+                            `${stats.buffer.audioEvents || 0}`;
+                        document.getElementById('facialEvents').textContent = 
+                            `${stats.buffer.videoEvents || 0}`;
+                    }
+                }, 500);
+            }
+
+            _updateDisplay(emotion) {
+                if (!emotion) return;
+
+                // Facial
+                if (emotion.faceEmotion) {
+                    const facial = emotion.faceEmotion;
+                    document.getElementById('facialEmotion').textContent = 
+                        facial.dominantEmotion?.toUpperCase() || emotion.faceEmotion.emotion?.toUpperCase() || '--';
+                    document.getElementById('facialConf').textContent = 
+                        Math.round((facial.confidence || 0) * 100);
+                }
+
+                // Audio
+                if (emotion.audioEmotion) {
+                    const audio = emotion.audioEmotion;
+                    document.getElementById('audioEmotion').textContent = 
+                        audio.emotion?.toUpperCase() || '--';
+                    document.getElementById('audioConf').textContent = 
+                        Math.round((audio.confidence || 0) * 100);
+                }
+
+                // Fused
+                if (emotion.fused) {
+                    const fused = emotion.fused;
+                    document.getElementById('fusedEmotion').textContent = 
+                        fused.emotion?.toUpperCase() || '--';
+                    document.getElementById('fusedConf').textContent = 
+                        Math.round((fused.confidence || 0) * 100);
+                    document.getElementById('fusedAgreement').textContent = 
+                        fused.agreement?.toUpperCase() || '--';
+
+                    // Show explanation
+                    if (fused.explanation) {
+                        const details = document.getElementById('agreementDetails');
+                        details.className = 'agreement-details';
+                        details.innerHTML = `
+                            <strong>${fused.explanation.summary || ''}</strong>
+                            ${fused.explanation.details?.join('<br>') || ''}
+                        `;
+                    }
+                }
+            }
+
+            _updateStatus(msg, type) {
+                const container = document.getElementById('statusContainer');
+                container.innerHTML = `
+                    <div class="status ${type}">
+                        <span class="status-indicator"></span>
+                        ${msg}
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize when page loads
+        let demo;
+        window.addEventListener('load', () => {
+            demo = new LucidXDemo();
+            console.log('✅ Demo loaded. Click "Start" to begin.');
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (demo && demo.integration) {
+                demo.integration.stop();
+            }
+        });
+    </script>
+</body>
+</html>
