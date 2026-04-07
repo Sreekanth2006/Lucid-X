@@ -53,10 +53,25 @@ app.post('/api/emotion/audio', upload.single('audio'), async (req, res) => {
         }
 
         const audioPath = req.file.path;
+        const originalExt = path.extname(req.file.originalname || '').toLowerCase();
+        const mimeExtMap = {
+            'audio/webm': '.webm',
+            'audio/ogg': '.ogg',
+            'audio/mp4': '.mp4',
+            'audio/mpeg': '.mp3',
+            'audio/wav': '.wav',
+            'audio/x-wav': '.wav'
+        };
+        const resolvedExt = originalExt || mimeExtMap[req.file.mimetype] || '.webm';
+        const audioPathWithExt = `${audioPath}${resolvedExt}`;
+
+        if (!fs.existsSync(audioPathWithExt)) {
+            fs.renameSync(audioPath, audioPathWithExt);
+        }
         
         // Call Python emotion recognizer with UTF-8 encoding
         const pythonScript = path.join(__dirname, '..', 'train.py');
-        const result = execSync(`python "${pythonScript}" --audio "${audioPath}"`, {
+        const result = execSync(`python "${pythonScript}" --audio "${audioPathWithExt}"`, {
             encoding: 'utf-8',
             cwd: path.join(__dirname, '..'),
             env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
@@ -78,8 +93,8 @@ app.post('/api/emotion/audio', upload.single('audio'), async (req, res) => {
         const emotionData = JSON.parse(jsonLine);
 
         // Clean up temp file
-        if (fs.existsSync(audioPath)) {
-            fs.unlinkSync(audioPath);
+        if (fs.existsSync(audioPathWithExt)) {
+            fs.unlinkSync(audioPathWithExt);
         }
 
         res.json({
@@ -93,8 +108,21 @@ app.post('/api/emotion/audio', upload.single('audio'), async (req, res) => {
     } catch (error) {
         console.error('❌ Emotion detection error:', error);
         // Clean up temp file on error
-        if (req.file && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
+        if (req.file) {
+            const basePath = req.file.path;
+            const candidates = [
+                basePath,
+                `${basePath}.webm`,
+                `${basePath}.ogg`,
+                `${basePath}.mp4`,
+                `${basePath}.mp3`,
+                `${basePath}.wav`
+            ];
+            for (const candidate of candidates) {
+                if (fs.existsSync(candidate)) {
+                    fs.unlinkSync(candidate);
+                }
+            }
         }
         res.json({
             success: false,

@@ -27,6 +27,10 @@ let modelsLoaded = false;
 let isCamEnabled = true;
 let isMicEnabled = true;
 
+// Audio Emotion Integration
+let audioIntegration = null;
+let lastFacialEmotion = null;
+
 const configuration = {
     'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }]
 };
@@ -97,6 +101,8 @@ async function loadEmotionModels() {
         // Start emotion detection when video is ready
         if (localVideo.srcObject) {
             startEmotionDetection();
+            // Initialize audio emotion integration
+            await initializeAudioEmotionIntegration();
         }
     } catch (error) {
         console.error('❌ Failed to load emotion models:', error);
@@ -177,6 +183,71 @@ function selectManualEmotion(emotion) {
     console.log(`📤 Manual emotion sent: ${emotion}`);
 }
 
+// Initialize Audio Emotion Integration
+async function initializeAudioEmotionIntegration() {
+    try {
+        console.log('🎙️ Initializing audio emotion integration...');
+        
+        // Check if audio modules are available
+        if (typeof LucidXAudioIntegration === 'undefined') {
+            console.warn('⚠️ Audio integration modules not loaded');
+            return false;
+        }
+        
+        // Create audio integration instance
+        audioIntegration = new LucidXAudioIntegration({
+            featureUpdateRate: 100,
+            useMeyda: typeof Meyda !== 'undefined',
+            predictionMethod: 'rule-based',
+            fusionStrategy: 'adaptive',
+            baseFacialWeight: 0.6,
+            baseAudioWeight: 0.4,
+            onEmotionUpdate: (result) => {
+                // Handle multimodal emotion result
+                console.log('🎭 Multimodal emotion:', result);
+                
+                // Update UI if available
+                if (emotionDisplay && result.finalEmotion) {
+                    const emotionText = result.finalEmotion.charAt(0).toUpperCase() + result.finalEmotion.slice(1);
+                    patientEmotion.textContent = emotionText;
+                    emotionConfidenceValue.textContent = `${Math.round(result.finalConfidence * 100)}%`;
+                    emotionConfidenceFill.style.width = `${Math.round(result.finalConfidence * 100)}%`;
+                    updateEmotionColor(result.finalEmotion, Math.round(result.finalConfidence * 100));
+                }
+                
+                // Send to server
+                socket.emit('multimodal-emotion', {
+                    facial: result.facial,
+                    audio: result.audio,
+                    fused: result.finalEmotion,
+                    confidence: result.finalConfidence,
+                    agreement: result.agreement,
+                    timestamp: Date.now(),
+                    sessionId: sessionId.textContent
+                });
+            },
+            onError: (error) => {
+                console.error('❌ Audio integration error:', error);
+            }
+        });
+        
+        // Initialize audio integration
+        const success = await audioIntegration.initialize();
+        if (success) {
+            console.log('✅ Audio emotion integration ready');
+            audioIntegration.start();
+            console.log('▶️ Audio emotion processing started');
+            return true;
+        } else {
+            console.warn('⚠️ Audio emotion integration failed to initialize');
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Failed to initialize audio integration:', error);
+        return false;
+    }
+}
+
 // Emotion Detection Function
 async function startEmotionDetection() {
     if (!modelsLoaded || !localVideo.srcObject) {
@@ -235,6 +306,16 @@ async function startEmotionDetection() {
                 
                 // Color code emotions
                 updateEmotionColor(mappedEmotion, confidencePercentage);
+                
+                // Record facial emotion for audio integration
+                if (audioIntegration) {
+                    audioIntegration.recordFaceEmotion({
+                        dominantEmotion: mappedEmotion,
+                        confidence: confidence,
+                        allExpressions: expressions,
+                        timestamp: Date.now()
+                    });
+                }
                 
                 // Send emotion data to server
                 const emotionData = {
@@ -498,6 +579,13 @@ endCallBtn.addEventListener('click', () => {
         if (emotionDetectionInterval) {
             clearInterval(emotionDetectionInterval);
         }
+        
+        // Stop audio integration
+        if (audioIntegration) {
+            audioIntegration.stop();
+            console.log('🎙️ Audio integration stopped');
+        }
+        
         socket.disconnect();
         
         // Show end screen
@@ -522,6 +610,11 @@ socket.on('disconnect', () => {
     // Clean up emotion detection
     if (emotionDetectionInterval) {
         clearInterval(emotionDetectionInterval);
+    }
+    
+    // Stop audio integration
+    if (audioIntegration) {
+        audioIntegration.stop();
     }
 });
 
