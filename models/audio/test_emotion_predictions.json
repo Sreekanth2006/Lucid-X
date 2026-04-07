@@ -1,0 +1,194 @@
+[
+  {
+    "file": "happy_1.wav",
+    "emotion": "hap",
+    "confidence": 0.8670160174369812,
+    "timestamp": "2026-04-06T15:08:25.208033",
+    "all_scores": [
+      {
+        "label": "hap",
+        "score": 0.8670160174369812
+      },
+      {
+        "label": "sad",
+        "score": 0.09900309145450592
+      },
+      {
+        "label": "ang",
+        "score": 0.025967538356781006
+      },
+      {
+        "label": "neu",
+        "score": 0.008013284765183926
+      }
+    ]
+  },
+  {
+    "file": "angry_1.wav",
+    "emotion": "hap",
+    "confidence": 0.6684673428535461,
+    "timestamp": "2026-04-06T15:08:25.347733",
+    "all_scores": [
+      {
+        "label": "hap",
+        "score": 0.6684673428535461
+      },
+      {
+        "label": "sad",
+        "score": 0.1656370609998703
+      },
+      {
+        "label": "ang",
+        "score": 0.16555491089820862
+      },
+      {
+        "label": "neu",
+        "score": 0.00034074910217896104
+      }
+    ]
+  },
+  {
+    "file": "angry_2.wav",
+    "emotion": "hap",
+    "confidence": 0.6991440057754517,
+    "timestamp": "2026-04-06T15:08:25.480542",
+    "all_scores": [
+      {
+        "label": "hap",
+        "score": 0.6991440057754517
+      },
+      {
+        "label": "ang",
+        "score": 0.1677379310131073
+      },
+      {
+        "label": "sad",
+        "score": 0.13263417780399323
+      },
+      {
+        "label": "neu",
+        "score": 0.00048383435932919383
+      }
+    ]
+  },
+  {
+    "file": "neutral_2.wav",
+    "emotion": "ang",
+    "confidence": 0.9338895678520203,
+    "timestamp": "2026-04-06T15:08:25.614620",
+    "all_scores": [
+      {
+        "label": "ang",
+        "score": 0.9338895678520203
+      },
+      {
+        "label": "neu",
+        "score": 0.046978823840618134
+      },
+      {
+        "label": "sad",
+        "score": 0.01909676566720009
+      },
+      {
+        "label": "hap",
+        "score": 3.481635212665424e-05
+      }
+    ]
+  },
+  {
+    "file": "happy_2.wav",
+    "emotion": "hap",
+    "confidence": 0.8132507801055908,
+    "timestamp": "2026-04-06T15:08:25.772597",
+    "all_scores": [
+      {
+        "label": "hap",
+        "score": 0.8132507801055908
+      },
+      {
+        "label": "sad",
+        "score": 0.1498032510280609
+      },
+      {
+        "label": "ang",
+        "score": 0.025334501639008522
+      },
+      {
+        "label": "neu",
+        "score": 0.011611483991146088
+      }
+    ]
+  },
+  {
+    "file": "neutral_1.wav",
+    "emotion": "ang",
+    "confidence": 0.9040471315383911,
+    "timestamp": "2026-04-06T15:08:25.933874",
+    "all_scores": [
+      {
+        "label": "ang",
+        "score": 0.9040471315383911
+      },
+      {
+        "label": "neu",
+        "score": 0.07049006223678589
+      },
+      {
+        "label": "sad",
+        "score": 0.025414247065782547
+      },
+      {
+        "label": "hap",
+        "score": 4.857161911786534e-05
+      }
+    ]
+  },
+  {
+    "file": "sad_2.wav",
+    "emotion": "hap",
+    "confidence": 0.6307858228683472,
+    "timestamp": "2026-04-06T15:08:26.077379",
+    "all_scores": [
+      {
+        "label": "hap",
+        "score": 0.6307858228683472
+      },
+      {
+        "label": "sad",
+        "score": 0.23189383745193481
+      },
+      {
+        "label": "ang",
+        "score": 0.1372799426317215
+      },
+      {
+        "label": "neu",
+        "score": 4.041335341753438e-05
+      }
+    ]
+  },
+  {
+    "file": "sad_1.wav",
+    "emotion": "hap",
+    "confidence": 0.507349967956543,
+    "timestamp": "2026-04-06T15:08:26.211849",
+    "all_scores": [
+      {
+        "label": "hap",
+        "score": 0.507349967956543
+      },
+      {
+        "label": "sad",
+        "score": 0.2941896915435791
+      },
+      {
+        "label": "ang",
+        "score": 0.19840019941329956
+      },
+      {
+        "label": "neu",
+        "score": 6.011154982843436e-05
+      }
+    ]
+  }
+]
