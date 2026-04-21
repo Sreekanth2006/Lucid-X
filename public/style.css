@@ -598,6 +598,101 @@ video.camera-off {
     font-size: 0.875rem;
 }
 
+/* NEW: Emotion Sources (Facial + Speech) */
+.emotion-sources {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 12px;
+    background-color: #0f172a;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.emotion-source {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.source-label {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.source-confidence {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-align: right;
+}
+
+/* NEW: Emotion Timeline */
+.emotion-timeline {
+    background-color: #0f172a;
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.timeline-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    background-color: #1e293b;
+    border-radius: 6px;
+    border-left: 3px solid var(--accent-color);
+    font-size: 0.75rem;
+    align-items: center;
+}
+
+.timeline-time {
+    color: var(--text-secondary);
+    font-weight: 500;
+    min-width: 50px;
+}
+
+.timeline-source {
+    font-size: 0.875rem;
+}
+
+.timeline-emotion {
+    flex: 1;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.timeline-confidence {
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+/* Scrollbar styling for timeline */
+.emotion-timeline::-webkit-scrollbar {
+    width: 4px;
+}
+
+.emotion-timeline::-webkit-scrollbar-track {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+.emotion-timeline::-webkit-scrollbar-thumb {
+    background: var(--accent-color);
+    border-radius: 4px;
+}
+
 /* End Screen */
 .end-screen {
     display: flex;

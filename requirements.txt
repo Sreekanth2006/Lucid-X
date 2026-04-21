@@ -1,0 +1,20 @@
+
+
+# Core Flask and server
+Flask>=2.3.0
+Flask-CORS>=4.0.0
+Werkzeug>=2.3.0
+
+# Audio processing
+librosa>=0.10.0
+numpy>=1.21.0
+scipy>=1.11.0
+
+# Speech emotion recognition (Hugging Face)
+transformers>=4.30.0
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# Utilities
+python-multipart>=0.0.6
+requests>=2.31.0

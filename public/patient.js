@@ -23,6 +23,7 @@ let peerConnection;
 let sessionStartTime;
 let durationInterval;
 let emotionDetectionInterval;
+let speechEmotionAnalyzer = null; // NEW: Speech analyzer instance
 let modelsLoaded = false;
 let isCamEnabled = true;
 let isMicEnabled = true;
@@ -309,6 +310,9 @@ socket.on('connect', () => {
         localStream = stream;
         localVideo.srcObject = stream;
         
+        // NEW: Initialize speech emotion analyzer
+        speechEmotionAnalyzer = new SpeechEmotionAnalyzer(stream, socket);
+        
         // Hide overlay when video starts
         localVideo.addEventListener('loadedmetadata', () => {
             localVideoOverlay.style.display = 'none';
@@ -339,6 +343,12 @@ socket.on('user-connected', userId => {
     sessionStatus.textContent = 'Connected to therapist';
     sessionStartTime = Date.now();
     durationInterval = setInterval(updateDuration, 1000);
+    
+    // NEW: Start speech emotion analysis when therapist connects
+    if (speechEmotionAnalyzer) {
+        speechEmotionAnalyzer.startAnalysis(sessionId.textContent);
+    }
+    
     callUser(userId);
 });
 
@@ -467,6 +477,12 @@ endCallBtn.addEventListener('click', () => {
         if (emotionDetectionInterval) {
             clearInterval(emotionDetectionInterval);
         }
+        
+        // NEW: Stop speech emotion analysis
+        if (speechEmotionAnalyzer) {
+            speechEmotionAnalyzer.stopAnalysis();
+        }
+        
         socket.disconnect();
         
         // Show end screen

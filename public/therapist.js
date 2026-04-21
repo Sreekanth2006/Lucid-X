@@ -18,6 +18,13 @@ const dominantEmotion = document.getElementById('dominant-emotion');
 const confidenceValue = document.getElementById('confidence-value');
 const confidenceFill = document.getElementById('confidence-fill');
 
+// NEW: Emotion source tracking
+const facialEmotion = document.getElementById('facial-emotion');
+const facialConfidence = document.getElementById('facial-confidence');
+const speechEmotion = document.getElementById('speech-emotion');
+const speechConfidence = document.getElementById('speech-confidence');
+const emotionTimeline = document.getElementById('emotion-timeline');
+
 // Session elements
 const sessionNotes = document.getElementById('session-notes');
 const saveNotesBtn = document.getElementById('save-notes');
@@ -27,6 +34,11 @@ let peerConnection;
 let sessionStartTime;
 let durationInterval;
 let emotionDetectionInterval;
+
+// NEW: Track emotions from both sources
+let lastFacialEmotion = { emotion: null, confidence: 0 };
+let lastSpeechEmotion = { emotion: null, confidence: 0 };
+let emotionHistory = []; // Timeline of all emotions
 
 const configuration = {
     'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }]
@@ -61,6 +73,83 @@ async function loadTherapistModels() {
 
 // Load models on startup
 loadTherapistModels();
+
+// NEW: Function to calculate overall emotion from both sources
+function calculateOverallEmotion() {
+    // Weight facial detection (70%) and speech (30%) - can be adjusted
+    const facialWeight = 0.7;
+    const speechWeight = 0.3;
+    
+    // If we only have one source, use that
+    if (lastFacialEmotion.emotion && !lastSpeechEmotion.emotion) {
+        return {
+            emotion: lastFacialEmotion.emotion,
+            confidence: lastFacialEmotion.confidence,
+            source: 'facial'
+        };
+    }
+    
+    if (lastSpeechEmotion.emotion && !lastFacialEmotion.emotion) {
+        return {
+            emotion: lastSpeechEmotion.emotion,
+            confidence: lastSpeechEmotion.confidence,
+            source: 'speech'
+        };
+    }
+    
+    // If we have both, calculate weighted average
+    if (lastFacialEmotion.emotion && lastSpeechEmotion.emotion) {
+        // For now, use the source with higher confidence
+        const facialConfidence = lastFacialEmotion.confidence * facialWeight;
+        const speechConfidence = lastSpeechEmotion.confidence * speechWeight;
+        
+        if (facialConfidence >= speechConfidence) {
+            return {
+                emotion: lastFacialEmotion.emotion,
+                confidence: facialConfidence,
+                source: 'facial'
+            };
+        } else {
+            return {
+                emotion: lastSpeechEmotion.emotion,
+                confidence: speechConfidence,
+                source: 'speech'
+            };
+        }
+    }
+    
+    return {
+        emotion: 'neutral',
+        confidence: 0,
+        source: 'none'
+    };
+}
+
+// NEW: Update emotion display with multiple sources
+function updateEmotionDisplay() {
+    const overall = calculateOverallEmotion();
+    
+    // Update dominant emotion
+    dominantEmotion.textContent = overall.emotion.charAt(0).toUpperCase() + overall.emotion.slice(1);
+    confidenceValue.textContent = `${Math.round(overall.confidence * 100)}%`;
+    confidenceFill.style.width = `${overall.confidence * 100}%`;
+    
+    // Color code the overall emotion
+    const positiveEmotions = ['happy', 'surprised'];
+    const negativeEmotions = ['sad', 'angry', 'fearful', 'disgusted'];
+    
+    let color;
+    if (positiveEmotions.includes(overall.emotion)) {
+        color = "#34d399";
+    } else if (negativeEmotions.includes(overall.emotion)) {
+        color = "var(--danger-color)";
+    } else {
+        color = "var(--text-primary)";
+    }
+    
+    dominantEmotion.style.color = color;
+    confidenceFill.style.backgroundColor = color;
+}
 
 // Update connection status
 function updateConnectionStatus(connected, text) {
@@ -196,6 +285,86 @@ socket.on('user-disconnected', () => {
         clearInterval(emotionDetectionInterval);
     }
 });
+
+// NEW: Handle emotion data from patient (facial + speech)
+socket.on('patient-emotion-update', (emotionData) => {
+    console.log('😊 Received emotion data:', emotionData);
+    
+    // Track emotion source
+    if (emotionData.source === 'speech') {
+        // Speech emotion
+        lastSpeechEmotion = {
+            emotion: emotionData.emotion,
+            confidence: emotionData.confidence
+        };
+        speechEmotion.textContent = emotionData.emotion.charAt(0).toUpperCase() + emotionData.emotion.slice(1);
+        speechConfidence.textContent = `${Math.round(emotionData.confidence * 100)}%`;
+        console.log(`🎤 Speech emotion: ${emotionData.emotion} (${Math.round(emotionData.confidence * 100)}%)`);
+    } else {
+        // Facial emotion (default)
+        lastFacialEmotion = {
+            emotion: emotionData.emotion,
+            confidence: emotionData.confidence
+        };
+        facialEmotion.textContent = emotionData.emotion.charAt(0).toUpperCase() + emotionData.emotion.slice(1);
+        facialConfidence.textContent = `${Math.round(emotionData.confidence * 100)}%`;
+        console.log(`🎭 Facial emotion: ${emotionData.emotion} (${Math.round(emotionData.confidence * 100)}%)`);
+    }
+    
+    // Add to timeline
+    emotionHistory.push({
+        time: new Date().toLocaleTimeString(),
+        source: emotionData.source || 'facial',
+        emotion: emotionData.emotion,
+        confidence: emotionData.confidence
+    });
+    
+    // Keep only last 20 emotions in timeline
+    if (emotionHistory.length > 20) {
+        emotionHistory.shift();
+    }
+    
+    // Update timeline UI
+    updateEmotionTimeline();
+    
+    // Update overall emotion display
+    updateEmotionDisplay();
+});
+
+// NEW: Update emotion timeline visualization
+function updateEmotionTimeline() {
+    let timelineHTML = '<div class="timeline-items">';
+    
+    emotionHistory.slice().reverse().forEach((entry, index) => {
+        const emoji = getEmotionEmoji(entry.emotion);
+        const sourceLabel = entry.source === 'speech' ? '🎤' : '🎭';
+        timelineHTML += `
+            <div class="timeline-item">
+                <span class="timeline-time">${entry.time}</span>
+                <span class="timeline-source">${sourceLabel}</span>
+                <span class="timeline-emotion">${emoji} ${entry.emotion}</span>
+                <span class="timeline-confidence">${Math.round(entry.confidence * 100)}%</span>
+            </div>
+        `;
+    });
+    
+    timelineHTML += '</div>';
+    emotionTimeline.innerHTML = timelineHTML;
+}
+
+// NEW: Get emoji for emotion type
+function getEmotionEmoji(emotion) {
+    const emojiMap = {
+        'happy': '😊',
+        'sad': '😢',
+        'angry': '😠',
+        'disgusted': '🤢',
+        'fearful': '😨',
+        'neutral': '😐',
+        'surprised': '😲'
+    };
+    return emojiMap[emotion] || '❓';
+}
 
 // WebRTC signaling handlers
 socket.on('receive-offer', async ({ offer, callerId }) => {

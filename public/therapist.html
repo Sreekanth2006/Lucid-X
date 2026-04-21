@@ -72,8 +72,20 @@
                         Loading AI Models...
                     </div>
                     <div id="emotion-data" class="emotion-data" style="display: none;">
+                        <div class="emotion-sources">
+                            <div class="emotion-source">
+                                <span class="source-label">Facial:</span>
+                                <span id="facial-emotion" class="emotion-value">--</span>
+                                <span id="facial-confidence" class="source-confidence">0%</span>
+                            </div>
+                            <div class="emotion-source">
+                                <span class="source-label">Speech:</span>
+                                <span id="speech-emotion" class="emotion-value">--</span>
+                                <span id="speech-confidence" class="source-confidence">0%</span>
+                            </div>
+                        </div>
                         <div class="dominant-emotion">
-                            <span class="label">Current State:</span>
+                            <span class="label">Overall State:</span>
                             <span id="dominant-emotion" class="emotion-value">Detecting...</span>
                         </div>
                         <div class="emotion-confidence">
@@ -83,6 +95,13 @@
                             </div>
                             <span id="confidence-value" class="confidence-value">0%</span>
                         </div>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3>Emotion Timeline</h3>
+                    <div id="emotion-timeline" class="emotion-timeline">
+                        <p style="color: var(--text-secondary); font-size: 12px;">Emotions will appear here...</p>
                     </div>
                 </div>
 
