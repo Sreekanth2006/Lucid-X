@@ -205,23 +205,28 @@ async function initializeAudioEmotionIntegration() {
             onEmotionUpdate: (result) => {
                 // Handle multimodal emotion result
                 console.log('🎭 Multimodal emotion:', result);
+
+                const resolvedEmotion = result?.finalEmotion || result?.emotion || result?.dominantEmotion || null;
+                const rawConfidence = result?.finalConfidence ?? result?.confidence ?? 0;
+                const normalizedConfidence = rawConfidence > 1 ? rawConfidence / 100 : rawConfidence;
+                const confidencePercent = Math.round(Math.max(0, Math.min(1, normalizedConfidence)) * 100);
                 
                 // Update UI if available
-                if (emotionDisplay && result.finalEmotion) {
-                    const emotionText = result.finalEmotion.charAt(0).toUpperCase() + result.finalEmotion.slice(1);
+                if (emotionDisplay && resolvedEmotion) {
+                    const emotionText = resolvedEmotion.charAt(0).toUpperCase() + resolvedEmotion.slice(1);
                     patientEmotion.textContent = emotionText;
-                    emotionConfidenceValue.textContent = `${Math.round(result.finalConfidence * 100)}%`;
-                    emotionConfidenceFill.style.width = `${Math.round(result.finalConfidence * 100)}%`;
-                    updateEmotionColor(result.finalEmotion, Math.round(result.finalConfidence * 100));
+                    emotionConfidenceValue.textContent = `${confidencePercent}%`;
+                    emotionConfidenceFill.style.width = `${confidencePercent}%`;
+                    updateEmotionColor(resolvedEmotion, confidencePercent);
                 }
                 
                 // Send to server
                 socket.emit('multimodal-emotion', {
-                    facial: result.facial,
-                    audio: result.audio,
-                    fused: result.finalEmotion,
-                    confidence: result.finalConfidence,
-                    agreement: result.agreement,
+                    facial: result?.facial || null,
+                    audio: result?.audio || null,
+                    fused: resolvedEmotion,
+                    confidence: confidencePercent,
+                    agreement: result?.agreement || null,
                     timestamp: Date.now(),
                     sessionId: sessionId.textContent
                 });

@@ -217,7 +217,7 @@ class AudioFeatureExtractor {
             console.log('✅ Meyda analyzer initialized');
             return true;
         } catch (error) {
-            console.warns('⚠️  Meyda initialization failed:', error);
+            console.warn('⚠️  Meyda initialization failed:', error);
             return false;
         }
     }

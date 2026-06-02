@@ -464,16 +464,17 @@
     </div>
 
     <!-- Load Models -->
-    <script async src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.5.0/dist/tf-core.min.js"></script>
-    <script async src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.5.0/dist/tf-converter.min.js"></script>
-    <script async src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.5.0/dist/tf-core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.5.0/dist/tf-converter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.min.js"></script>
     
-    <!-- Audio Emotion Recognition Modules -->
-    <script src="ml/audioCapture.js"></script>
-    <script src="ml/audioEmotionPredictor.js"></script>
-    <script src="ml/emotionEventBuffer.js"></script>
-    <script src="ml/advancedMultimodalFusion.js"></script>
-    <script src="ml/audioIntegrationExample.js"></script>
+    <!-- Architecture Modules -->
+    <script src="ml/emotionDetector.js"></script>
+    <script src="ml/audioEmotionRecognizer.js"></script>
+    <script src="ml/multimodalFusion.js"></script>
+    <script src="ml/temporalEmotionModel.js"></script>
+    <script src="ml/explainableAI.js"></script>
+    <script src="ml/sessionReport.js"></script>
     
     <!-- Optional: Meyda for advanced audio analysis -->
     <script src="https://cdn.jsdelivr.net/npm/meyda@4.3.0"></script>
@@ -500,7 +501,17 @@
             audioChunks: [],
             faceDetectInterval: null,
             currentFace: { emotion: '--', confidence: 0 },
-            currentAudio: { emotion: '--', confidence: 0 }
+            currentAudio: { emotion: '--', confidence: 0 },
+            lastInsightLogCount: 0,
+            architecture: {
+                detector: null,
+                audio: null,
+                fusion: null,
+                temporal: null,
+                xai: null,
+                report: null,
+                explainabilityText: 'Waiting for analysis...'
+            }
         };
 
         function log(msg, type = 'info') {
@@ -587,7 +598,34 @@
                 state.audioPredictor = null;
                 state.noiseFloorRms = 0.01;
                 state.calibrationFrames = 0;
-                log('Local audio classifier ready', 'success');
+                log('Audio preprocessing ready', 'success');
+
+                // Initialize architecture modules
+                state.architecture.detector = new EmotionDetector({
+                    modelSource: '/models',
+                    inputSize: 224,
+                    scoreThreshold: 0.45,
+                    confidenceThreshold: 0.3
+                });
+                state.architecture.audio = new AudioEmotionRecognizer({
+                    mediaStream: stream,
+                    sampleRate: 16000,
+                    fftSize: 2048,
+                    smoothingTimeConstant: 0.7
+                });
+                state.architecture.fusion = new MultimodalFusionEngine({
+                    facialWeight: 0.6,
+                    audioWeight: 0.4
+                });
+                state.architecture.temporal = new TemporalEmotionModel({
+                    windowSize: 15,
+                    trendWindow: 5
+                });
+                state.architecture.xai = new ExplainableAI();
+                state.architecture.report = new SessionReportGenerator({
+                    sessionName: `Realtime_${Date.now()}`
+                });
+                log('Architecture modules initialized', 'success');
 
                 // Media recorder (audio-only stream + MIME fallback)
                 const recorderSetup = createCompatibleRecorder(stream);
@@ -610,6 +648,16 @@
                 // Load models
                 if (!state.modelsLoaded) {
                     await loadModels();
+                }
+
+                // Initialize architecture audio recognizer
+                if (state.architecture.audio) {
+                    const audioInitialized = await state.architecture.audio.initialize();
+                    if (audioInitialized) {
+                        log('Audio analysis module ready', 'success');
+                    } else {
+                        log('Audio analysis module failed to initialize', 'error');
+                    }
                 }
 
                 // Start loops
@@ -640,6 +688,8 @@
 
             state.currentFace = { emotion: '--', confidence: 0 };
             state.currentAudio = { emotion: '--', confidence: 0 };
+            state.lastInsightLogCount = 0;
+            state.architecture.explainabilityText = 'Session stopped.';
             updateFinalDisplay('--', 0);
             
             document.getElementById('startBtn').disabled = false;
@@ -662,27 +712,23 @@
                     await new Promise(resolve => setTimeout(resolve, 200));
                 }
 
-                const sources = [
-                    '/models',
-                    'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model'
-                ];
-
                 let loaded = false;
-                for (const uri of sources) {
-                    try {
-                        await faceapi.nets.tinyFaceDetector.loadFromUri(uri);
-                        await faceapi.nets.faceExpressionNet.loadFromUri(uri);
-                        loaded = true;
-                        log(`Face models loaded from ${uri}`, 'success');
-                        break;
-                    } catch (modelError) {
-                        log(`Face model source failed: ${uri}`, 'error');
-                    }
+                if (state.architecture.detector) {
+                    loaded = await state.architecture.detector.loadModels();
                 }
 
                 if (!loaded) {
-                    throw new Error('Unable to load face models from local or CDN sources');
+                    log('Local model source failed, switching to CDN source', 'info');
+                    state.architecture.detector = new EmotionDetector({
+                        modelSource: 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model',
+                        inputSize: 224,
+                        scoreThreshold: 0.45,
+                        confidenceThreshold: 0.3
+                    });
+                    loaded = await state.architecture.detector.loadModels();
                 }
+
+                if (!loaded) throw new Error('Unable to load face models from local or CDN sources');
 
                 state.modelsLoaded = true;
                 log('Face analysis ready', 'success');
@@ -734,14 +780,18 @@
                 state.isSilent = false;
             }
 
-            // Realtime classifier focused on spoken/laughter tone characteristics.
-            if (!state.isSilent) {
-                const features = extractRealtimeAudioFeatures(data, rms, peak);
-                const prediction = predictRealtimeAudioEmotion(features);
-                updateAudioDisplay(prediction.emotion.toUpperCase(), prediction.confidence);
+            // Architecture audio analysis: preprocessing + feature extraction + prediction.
+            if (!state.isSilent && state.architecture.audio?.isInitialized) {
+                const features = state.architecture.audio.extractFeatures();
+                const prediction = state.architecture.audio.predictEmotion();
+
+                if (features && prediction) {
+                    const conf = Math.max(0, Math.min(1, (prediction.confidence || 0) / 100));
+                    updateAudioDisplay((prediction.emotion || 'neutral').toUpperCase(), conf, prediction);
+                    state.architecture.report?.recordAudioEvent(prediction);
+                }
             } else {
-                // No speech: show low-confidence neutral instead of blank output.
-                updateAudioDisplay('NEUTRAL', 0.05);
+                updateAudioDisplay('NEUTRAL', 0.05, null);
             }
 
             state.animationId = requestAnimationFrame(analyzeAudio);
@@ -885,7 +935,7 @@
             setTimeout(sendAudio, 100);
         }
 
-        function updateAudioDisplay(emotion, confidence) {
+        function updateAudioDisplay(emotion, confidence, rawPrediction = null) {
             document.getElementById('audioEmotion').textContent = emotion;
             const c = Math.round(confidence * 100);
             document.getElementById('audioConfidenceFill').style.width = c + '%';
@@ -899,7 +949,11 @@
                 }
             }
 
-            state.currentAudio = { emotion, confidence };
+            state.currentAudio = {
+                emotion,
+                confidence,
+                rawPrediction
+            };
             updateFinalDisplay();
         }
 
@@ -916,19 +970,17 @@
                     return;
                 }
 
-                const detections = await faceapi
-                    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.45 }))
-                    .withFaceExpressions();
+                const results = await state.architecture.detector.detectEmotions(video);
 
-                if (detections && detections.expressions) {
-                    const [emotion, score] = Object.entries(detections.expressions)
-                        .sort((a, b) => b[1] - a[1])[0];
-                    const e = emotion.toUpperCase();
+                if (results && results.length > 0) {
+                    const face = results[0];
+                    const e = (face.dominantEmotion || 'neutral').toUpperCase();
+                    const score = Math.max(0, Math.min(1, (face.confidence || 0) / 100));
                     const c = Math.round(score * 100);
                     log(`Face: ${e} (${c}%)`, 'success');
-                    updateFaceDisplay(e, score);
+                    updateFaceDisplay(e, score, face);
                 } else {
-                    updateFaceDisplay('--', 0);
+                    updateFaceDisplay('NEUTRAL', 0.05, null);
                 }
             } catch (e) {
                 log(`Face error: ${e.message}`, 'error');
@@ -937,7 +989,7 @@
             setTimeout(detectFace, 500);
         }
 
-        function updateFaceDisplay(emotion, confidence) {
+        function updateFaceDisplay(emotion, confidence, rawFace = null) {
             document.getElementById('faceEmotion').textContent = emotion;
             const c = Math.round(confidence * 100);
             document.getElementById('faceConfidenceFill').style.width = c + '%';
@@ -952,7 +1004,11 @@
                 }
             }
 
-            state.currentFace = { emotion, confidence };
+            state.currentFace = {
+                emotion,
+                confidence,
+                rawFace
+            };
             updateFinalDisplay();
         }
 
@@ -964,12 +1020,46 @@
             let finalConfidence = 0;
 
             if (face.emotion !== '--' && audio.emotion !== '--') {
-                if (face.emotion === audio.emotion) {
-                    finalEmotion = face.emotion;
-                    finalConfidence = Math.min(1, (face.confidence * 0.6) + (audio.confidence * 0.4) + 0.1);
-                } else {
-                    finalEmotion = face.confidence >= audio.confidence ? face.emotion : audio.emotion;
-                    finalConfidence = Math.max(face.confidence, audio.confidence) * 0.85;
+                const facePayload = {
+                    emotion: face.emotion.toLowerCase(),
+                    confidence: Math.round(face.confidence * 100),
+                    allExpressions: face.rawFace?.allExpressions || []
+                };
+                const audioPayload = {
+                    emotion: audio.emotion.toLowerCase(),
+                    confidence: Math.round(audio.confidence * 100),
+                    allExpressions: null
+                };
+
+                const fusion = state.architecture.fusion?.fuseEmotions(facePayload, audioPayload);
+                if (fusion) {
+                    const temporal = state.architecture.temporal?.addEmotionFrame(
+                        fusion.dominantEmotion,
+                        fusion.confidence,
+                        fusion.fusedProbabilities
+                    );
+
+                    finalEmotion = (temporal?.smoothedEmotion || fusion.dominantEmotion || 'neutral').toUpperCase();
+                    finalConfidence = Math.max(0, Math.min(1, (temporal?.smoothedConfidence || fusion.confidence || 0) / 100));
+
+                    state.architecture.report?.recordMultimodalEvent(fusion);
+
+                    if (face.rawFace?.landmarks && face.rawFace?.box && state.architecture.xai) {
+                        const xai = state.architecture.xai.generateSaliencyMap(
+                            { landmarks: face.rawFace.landmarks, box: face.rawFace.box },
+                            finalEmotion.toLowerCase(),
+                            Math.round(finalConfidence * 100)
+                        );
+                        if (xai?.explanation?.summary) {
+                            state.architecture.explainabilityText = xai.explanation.summary;
+                        } else {
+                            state.architecture.explainabilityText = `${finalEmotion}: key facial regions contributed to this prediction.`;
+                        }
+                    }
+
+                    const trend = temporal?.trend || 'stable';
+                    const stability = temporal?.stabilityScore ?? 0;
+                    document.getElementById('statusText').textContent = `Recording... | Trend: ${trend} | Stability: ${stability}%`;
                 }
             } else if (face.emotion !== '--') {
                 finalEmotion = face.emotion;
@@ -983,6 +1073,13 @@
             const c = Math.round(finalConfidence * 100);
             document.getElementById('fusionConfidenceFill').style.width = c + '%';
             document.getElementById('fusionConfidenceText').textContent = c + '%';
+
+            const totalEvents = state.architecture.report?.sessionData?.multimodalEvents?.length || 0;
+            if (totalEvents > 0 && totalEvents % 10 === 0 && totalEvents !== state.lastInsightLogCount) {
+                log(`Therapist Output: timeline updated, ${totalEvents} multimodal events captured`, 'info');
+                log(`Explainability: ${state.architecture.explainabilityText}`, 'info');
+                state.lastInsightLogCount = totalEvents;
+            }
 
             const fusionCard = document.getElementById('fusionEmotionDisplay');
             if (fusionCard) {

@@ -29,6 +29,7 @@ class AudioEmotionPredictor {
         };
 
         this.predictionHistory = [];
+        this.rawPredictionHistory = [];
         this.featureHistory = [];
         this.modelWeights = this._initializeModelWeights();
 
@@ -49,30 +50,43 @@ class AudioEmotionPredictor {
             return this._createEmptyPrediction();
         }
 
-        let prediction;
+        let rawPrediction;
 
         // Choose prediction method
         switch (this.config.predictionMethod) {
             case 'ml-model':
-                prediction = this._predictWithMLModel(features);
+                rawPrediction = this._predictWithMLModel(features);
                 break;
             case 'simplified-classifier':
-                prediction = this._predictWithClassifier(features);
+                rawPrediction = this._predictWithClassifier(features);
                 break;
             case 'rule-based':
             default:
-                prediction = this._predictWithRules(features);
+                rawPrediction = this._predictWithRules(features);
+        }
+
+        // Guard against async outputs from unsupported synchronous call paths.
+        if (rawPrediction && typeof rawPrediction.then === 'function') {
+            console.warn('Async ML model output detected in sync predictor path, falling back to rule-based prediction');
+            rawPrediction = this._predictWithRules(features);
         }
 
         // Apply smoothing
-        prediction = this._applySmoothingWindow(prediction);
+        const prediction = this._applySmoothingWindow(rawPrediction);
 
-        // Store in history
+        // Store raw and smoothed predictions separately to avoid feedback artifacts.
+        this.rawPredictionHistory.push(rawPrediction);
         this.predictionHistory.push(prediction);
+
         this.featureHistory.push(features);
         
         if (this.predictionHistory.length > 50) {
             this.predictionHistory.shift();
+        }
+        if (this.rawPredictionHistory.length > 50) {
+            this.rawPredictionHistory.shift();
+        }
+        if (this.featureHistory.length > 50) {
             this.featureHistory.shift();
         }
 
@@ -356,15 +370,15 @@ class AudioEmotionPredictor {
      * @private
      */
     _applySmoothingWindow(prediction) {
-        this.predictionHistory.push(prediction);
+        const smoothingWindow = Math.max(1, this.config.smoothingWindow || 1);
+        const rawWindow = [...this.rawPredictionHistory, prediction];
 
-        if (this.predictionHistory.length < this.config.smoothingWindow) {
+        if (rawWindow.length < smoothingWindow) {
             return prediction;
         }
 
         // Average recent predictions
-        const windowStart = Math.max(0, this.predictionHistory.length - this.config.smoothingWindow);
-        const window = this.predictionHistory.slice(windowStart);
+        const window = rawWindow.slice(-smoothingWindow);
 
         // Weighted moving average (more recent = higher weight)
         const smoothedConfidences = {};
@@ -516,6 +530,7 @@ class AudioEmotionPredictor {
      */
     reset() {
         this.predictionHistory = [];
+        this.rawPredictionHistory = [];
         this.featureHistory = [];
     }
 }

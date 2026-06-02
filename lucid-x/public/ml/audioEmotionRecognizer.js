@@ -16,12 +16,14 @@ class AudioEmotionRecognizer {
             minDecibels: config.minDecibels || -100,
             maxDecibels: config.maxDecibels || -10,
             smoothingTimeConstant: config.smoothingTimeConstant || 0.8,
+            mediaStream: config.mediaStream || null,
             ...config
         };
 
         this.audioContext = null;
         this.analyser = null;
         this.mediaStream = null;
+        this.ownsMediaStream = false;
         this.isInitialized = false;
         this.audioBuffer = [];
         this.featureHistory = [];
@@ -45,14 +47,20 @@ class AudioEmotionRecognizer {
         try {
             console.log('🎤 Initializing audio capture...');
 
-            // Request microphone access
-            this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                }
-            });
+            // Reuse external stream if provided, otherwise request microphone access.
+            if (this.config.mediaStream) {
+                this.mediaStream = this.config.mediaStream;
+                this.ownsMediaStream = false;
+            } else {
+                this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                this.ownsMediaStream = true;
+            }
 
             // Create audio context
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
@@ -241,36 +249,85 @@ class AudioEmotionRecognizer {
         const avgEnergy = window.reduce((sum, f) => sum + f.energy, 0) / window.length;
         const avgPitch = window.reduce((sum, f) => sum + f.pitch, 0) / window.length;
         const avgCentroid = window.reduce((sum, f) => sum + f.spectralCentroid, 0) / window.length;
+        const avgZcr = window.reduce((sum, f) => sum + (f.zeroCrossingRate || 0), 0) / window.length;
 
-        // Simple rule-based emotion classification
-        let emotion = 'neutral';
-        let confidence = 0;
+        const energyVariance = window.reduce((sum, f) => {
+            const delta = f.energy - avgEnergy;
+            return sum + (delta * delta);
+        }, 0) / window.length;
 
-        if (avgEnergy > 0.7 && avgPitch > 200) {
-            emotion = 'happy';
-            confidence = Math.min(100, Math.round((avgEnergy + (avgPitch / 400)) * 100 / 2));
-        } else if (avgEnergy < 0.3 && avgPitch < 150) {
-            emotion = 'sad';
-            confidence = Math.min(100, Math.round((0.6 - avgEnergy + (150 / avgPitch)) * 100 / 2));
-        } else if (avgEnergy > 0.6 && avgPitch > 150) {
-            emotion = 'angry';
-            confidence = Math.min(100, Math.round(avgEnergy * 100));
-        } else if (avgEnergy > 0.7 && avgCentroid > 4000) {
-            emotion = 'surprised';
-            confidence = Math.min(100, Math.round((avgEnergy * 100 + (avgCentroid / 8000) * 100) / 2));
-        } else {
-            emotion = 'neutral';
-            confidence = Math.min(100, Math.round(avgEnergy * 50));
+        // Strong silence guard to prevent low-level background noise from being labeled as emotion.
+        if (avgEnergy < 0.08) {
+            const silentPrediction = {
+                emotion: 'neutral',
+                confidence: 25,
+                allEmotions: {
+                    happy: 5,
+                    sad: 10,
+                    angry: 5,
+                    fearful: 5,
+                    surprised: 5,
+                    disgusted: 5,
+                    neutral: 65
+                },
+                timestamp: Date.now(),
+                features: {
+                    energy: Math.round(avgEnergy * 100),
+                    pitch: Math.round(avgPitch),
+                    spectralCentroid: Math.round(avgCentroid),
+                    zeroCrossingRate: Number(avgZcr.toFixed(3))
+                }
+            };
+
+            this.emotionPredictions.push(silentPrediction);
+            if (this.emotionPredictions.length > 100) {
+                this.emotionPredictions.shift();
+            }
+
+            return silentPrediction;
         }
+
+        // Normalize to stable [0,1] ranges for more robust emotion scoring.
+        const normEnergy = Math.min(1, Math.max(0, avgEnergy));
+        const normPitch = Math.min(1, Math.max(0, (avgPitch - 80) / 220));
+        const normCentroid = Math.min(1, Math.max(0, avgCentroid / 6000));
+        const normZcr = Math.min(1, Math.max(0, avgZcr));
+        const normVariance = Math.min(1, energyVariance * 14);
+
+        const scores = {
+            happy: (normEnergy * 0.45) + (normPitch * 0.35) + (normCentroid * 0.2),
+            sad: ((1 - normEnergy) * 0.55) + ((1 - normPitch) * 0.35) + ((1 - normZcr) * 0.1),
+            angry: (normEnergy * 0.5) + (normCentroid * 0.25) + (normZcr * 0.25),
+            fearful: (normEnergy * 0.35) + (normZcr * 0.25) + (normVariance * 0.4),
+            surprised: (normEnergy * 0.4) + (normCentroid * 0.3) + (normVariance * 0.3),
+            disgusted: ((1 - Math.abs(normEnergy - 0.55)) * 0.35) + ((1 - Math.abs(normCentroid - 0.45)) * 0.35) + (normZcr * 0.3),
+            neutral: ((1 - Math.abs(normEnergy - 0.35)) * 0.5) + ((1 - Math.abs(normPitch - 0.4)) * 0.35) + ((1 - normVariance) * 0.15)
+        };
+
+        Object.keys(scores).forEach((key) => {
+            scores[key] = Math.min(1, Math.max(0, scores[key]));
+        });
+
+        const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+        const emotion = best ? best[0] : 'neutral';
+        const confidence = best ? Math.round(best[1] * 100) : 0;
+
+        const scoreSum = Object.values(scores).reduce((sum, value) => sum + value, 0) || 1;
+        const allEmotions = {};
+        Object.entries(scores).forEach(([key, value]) => {
+            allEmotions[key] = Math.round((value / scoreSum) * 100);
+        });
 
         const prediction = {
             emotion,
             confidence,
+            allEmotions,
             timestamp: Date.now(),
             features: {
                 energy: Math.round(avgEnergy * 100),
                 pitch: Math.round(avgPitch),
-                spectralCentroid: Math.round(avgCentroid)
+                spectralCentroid: Math.round(avgCentroid),
+                zeroCrossingRate: Number(avgZcr.toFixed(3))
             }
         };
 
@@ -306,10 +363,10 @@ class AudioEmotionRecognizer {
      * Stop audio capture
      */
     stop() {
-        if (this.mediaStream) {
+        if (this.mediaStream && this.ownsMediaStream) {
             this.mediaStream.getTracks().forEach(track => track.stop());
-            this.mediaStream = null;
         }
+        this.mediaStream = null;
         if (this.audioContext) {
             this.audioContext.close();
             this.audioContext = null;
